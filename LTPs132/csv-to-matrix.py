@@ -2,72 +2,83 @@
 
 import argparse
 import csv
-
-# create a column of taxa names in csv file by matching taxa names 
-#in renamed tree file to taxa names in csv file of characters
-
-
+from collections import defaultdict
 
 def get_args():
 
     #create and argumentparser object('parser') that will hold all info to parse the cmd line
-    parser = argparse.ArgumentParser(description = 'pulls accession numbers and taxon names from fasta files and produces a dictionary from which you can rename the tips of a nexus tree file')
+    parser = argparse.ArgumentParser(description = 'This script removes false frequency-code pairs from telemetry data')
 
     #positional arguments
-    parser.add_argument('fasta_infile', help='input fasta file', type=str)
-    parser.add_argument('tree_infile', help='input tree file', type=str)
-    #optional arguments
-    parser.add_argument('-slo','--seqlist_outfile', help='output file name data', type=str, default='tiplabels.out')
-    parser.add_argument('-f1','--format1', help='format of input file', type=str, default='fasta')
-    parser.add_argument('-f2','--format2', help='format for output file', type=str, default='fasta-2line')
-    parser.add_argument('-fo','--fasta_outfile', help='name for your output file', type=str, default='output.fixed.fa')
+    #number argument to input
+    parser.add_argument('csv', help='csv input file')
+    parser.add_argument('tree_file', help='input tree file')
 
     #parse the cmd line arguments
     return parser.parse_args()
 
+def parse_csv():
+    # names dictionary: key = frequency, value = list of real names
+    names = defaultdict(dict)
 
-# parses the fasta file and creates a dictionary of accessions (keys):taxon name (defs)
-def parse_fasta():
-    # acessions dictionary: key = frequency, value = list of real acessions
-    accessions = defaultdict(dict)
-
-    # opening and reading fasta file
-    with open(args.seqlist_outfile, 'r') as fas:   
+    # opening and reading tags file
+    with open(args.csv, 'r') as chars:   
         #create a csv reader object
-        reader = csv.reader(fas, delimiter='_')
-        # read in file line by line
-        
-        for line in reader:
+        reader = csv.reader(chars, delimiter=',')
 
-            # stringify what we want to be in the new tip names
-            #object that contains the accession number of a fasta seq
-            access=str(line[0])
-            # object that contains the names of a taxon. In this case genus, species, [subsp], [unclassified], family
-            name='_'.join(line[5:])
+        #skip the header line
+        header = next(reader)
+
+        # read in file line by line
+        for line in reader:
 
             #skip blank lines
             if not line:
                 continue
+            
             else:
-                # this searches for keys, if keys exist it appends the fasta info, if it doesn't then it creates that key for that accession # and then appends the info
                 # need to ask if key exists already
-                if line[0] in accessions:
+                if line[0] in names:
                     # same as appending to a regular list
-                    accessions[line[0]].append(str(access+'_'+name))
+                    names[line[0]].append(line[1])
                 else:
-                    accessions[line[0]] = []
-                    accessions[line[0]].append(str(access+'_'+name))
-        #check our work
-        for accession,name in accessions.items():
-            print(accession, name)
-        
-    return accessions
+                    names[line[0]] = []
+                    names[line[0]].append(line[1])
 
-    def main():
-    fasta_fixer()
-    seq_list(cmd="grep '>' "+args.fasta_outfile+" | tr -d '.' | tr -d '>' > "+args.seqlist_outfile)
-    fas_dict = parse_fasta()
-#    parse_tree(code_dict)
+        #check our work
+        for name,value in names.items():
+            print(name, value)
+        
+    return names
+
+def parse_tree(names_dict):
+
+    i=1
+    # open, read, and parse the telemetry data file
+    with open(args.tree_file, 'r') as tree:
+        for line in tree:
+
+            #skip the header, could make the value an optional input
+            if '#NEXUS' in line:
+                print(line, end=' ')
+                continue
+            elif 'Begin' in line:
+                print(line, end=' ')
+                continue
+            elif 'Translate' in line:
+                print(line, end=' ')
+                continue
+            else:
+                for value,name in names_dict.items():
+                    if str(name) in line:
+                            print(name+',')
+                    else:
+                        continue
+
+
+def main():
+    names_dict = parse_csv()
+    parse_tree(names_dict)
 
 #get the arguments before calling main
 args = get_args()
@@ -75,3 +86,5 @@ args = get_args()
 #execute the program by calling main. __ __allow you to call these functions in other scripts and not just through this one
 if __name__ == '__main__':
     main() 
+
+
